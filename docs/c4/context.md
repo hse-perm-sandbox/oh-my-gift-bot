@@ -7,7 +7,7 @@ C4Context
 
     Enterprise_Boundary(Фонд, "") {
         System(OhMyGiftBot, "Telegram-бот OhMyGift!", "Помогает пользователю готовиться к праздникам")
-        System(OhMyGiftBot, "База данных")
+        System(БазаДанных, "База данных", "Хранит в себе информацию")
         Person(Разработчик, "Разработчик бота", "Обновляет базу данных")
     }
 
@@ -16,12 +16,13 @@ C4Context
     System_Ext(Telegram, "Платформа Telegram")
     
     Rel(Пользователь, OhMyGiftBot, "Взаимодействует с ботом")
-    Rel(Разработчик, OhMyGiftBot, "Вносит изменения в базу данных глобальных праздников")
+    Rel(Разработчик, БазаДанных, "Вносит изменения в базу данных глобальных праздников")
+    Rel(OhMyGiftBot, БазаДанных, "Читает/записывает данные")
     Rel(OhMyGiftBot, Сервис, "Предоставляет API - ключ")
     Rel(OhMyGiftBot, Telegram, "Работает внутри мессенджера")
 
     UpdateRelStyle(Пользователь, OhMyGiftBot, $offsetY="-80", $offsetX="-100")
-    UpdateRelStyle(Разработчик, OhMyGiftBot, $offsetY="40", $offsetX="-100")
+    UpdateRelStyle(Разработчик, БазаДанных, $offsetY="40", $offsetX="-100")
     UpdateRelStyle(OhMyGiftBot, Сервис, $offsetY="-20", $offsetX="-100")
     UpdateRelStyle(OhMyGiftBot, Telegram, $textColor="black", $lineColor="black", $offsetY="10")
 ```
