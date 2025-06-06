@@ -5,26 +5,21 @@
 C4Context
     title Система для трекинга праздников
 
-    Enterprise_Boundary(Фонд, "") {
-        System(OhMyGiftBot, "Telegram-бот OhMyGift!", "Помогает пользователю готовиться к праздникам")
-        System(БазаДанных, "База данных", "Хранит в себе информацию")
-        Person(Разработчик, "Разработчик бота", "Обновляет базу данных")
+    Enterprise_Boundary(ent, "") {
+        System(bot, "Telegram-бот OhMyGift!", "#160;Помогает пользователю готовиться к праздникам")
     }
 
-    Person(Пользователь, "Пользователь")
-    System_Ext(Сервис, "IO.NET")
+    Person(user, "Пользователь")
     System_Ext(Telegram, "Платформа Telegram")
+    System_Ext(AiApi, "IO.NET", "#160;Написать что делает система")
     
-    Rel(Пользователь, OhMyGiftBot, "Взаимодействует с ботом")
-    Rel(Разработчик, БазаДанных, "Вносит изменения в базу данных глобальных праздников")
-    Rel(OhMyGiftBot, БазаДанных, "Читает/записывает данные")
-    Rel(OhMyGiftBot, Сервис, "Предоставляет API - ключ")
-    Rel(OhMyGiftBot, Telegram, "Работает внутри мессенджера")
+    Rel(user, Telegram, "Обращается к боту для...")
+    Rel(bot, AiApi, "Написать для чего бот обращается к этой системе")
+    Rel(bot, Telegram, "Получает запросы<br>отправляет сообщения")
 
-    UpdateRelStyle(Пользователь, OhMyGiftBot, $offsetY="-80", $offsetX="-100")
-    UpdateRelStyle(Разработчик, БазаДанных, $offsetY="40", $offsetX="-100")
-    UpdateRelStyle(OhMyGiftBot, Сервис, $offsetY="-20", $offsetX="-100")
-    UpdateRelStyle(OhMyGiftBot, Telegram, $textColor="black", $lineColor="black", $offsetY="10")
+    UpdateRelStyle(user, Telegram, $offsetY="-80", $offsetX="-100")
+    UpdateRelStyle(bot, AiApi, $offsetY="-80", $offsetX="-50")
+    UpdateRelStyle(bot, Telegram, , $offsetY="-20", $offsetX="-80")
 ```
 
 ## Описание компонентов:
