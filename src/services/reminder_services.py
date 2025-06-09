@@ -38,33 +38,32 @@ class ReminderService:
 
             time.sleep(3600) # Проверка каждый час
 
-
     def check_global_holidays(self, today: datetime.date, tomorrow: datetime.date, week_later: datetime.date):
         """Проверяет и отправляет уведомления о глобальных праздниках"""
         holidays = self.db.get_global_holidays()
-        # Получаем все чаты, где есть события
         cursor = self.db.conn.cursor()
         cursor.execute('SELECT DISTINCT chat_id FROM birthdays UNION SELECT DISTINCT chat_id FROM holidays')
         chat_ids = [row[0] for row in cursor.fetchall()]
 
-        for name, date, desc in holidays:
-            holiday_date = datetime.date(today.year, date.month, date.day)
+        for chat_id in chat_ids:
+            settings = self.db.get_notification_settings(chat_id, 'global_holiday')
+            if not settings:
+                continue
 
-            if holiday_date == today:
-                # Отправка уведомления о сегодняшнем празднике
-                for chat_id in chat_ids:
+            for name, date, desc in holidays:
+                holiday_date = datetime.date(today.year, date.month, date.day)
+
+                if holiday_date == today and settings['notify_on_day']:
                     try:
                         self.bot.send_message(chat_id, f"🎉 Сегодня праздник: {name}!\n\n{desc}")
                     except Exception as e:
                         logging.error(f"Ошибка при отправке сообщения в чат {chat_id}: {e}")
-            elif holiday_date == tomorrow:
-                for chat_id in chat_ids:
+                elif holiday_date == tomorrow and settings['notify_one_day_before']:
                     try:
                         self.bot.send_message(chat_id, f"Напоминание: завтра праздник - {name}! 🎉")
                     except Exception as e:
                         logging.error(f"Ошибка при отправке напоминания в чат {chat_id}: {e}")
-            elif holiday_date == week_later:
-                for chat_id in chat_ids:
+                elif holiday_date == week_later and settings['notify_one_week_before']:
                     try:
                         self.bot.send_message(chat_id, f"Напоминание: через 7 дней праздник - {name}! 🎉")
                     except Exception as e:
@@ -78,6 +77,10 @@ class ReminderService:
 
         for event_type in ['birthday', 'holiday']:
             for chat_id in chat_ids:
+                settings = self.db.get_notification_settings(chat_id, event_type)
+                if not settings:
+                    continue
+
                 if event_type == 'birthday':
                     cursor.execute('SELECT name, date, wishes, notes FROM birthdays WHERE chat_id = ?', (chat_id,))
                 else:
@@ -88,28 +91,30 @@ class ReminderService:
                         name, date_str, wishes, notes = row
                     else:
                         name, date_str, notes = row
-                        wishes = ""
+                        wishes = ''
 
                     event_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                    event_date_this_year = datetime.date(today.year, event_date.month, event_date.day)
+                    event_date_by_year = datetime.date(today.year, event_date.month, event_date.day)
 
-                    if event_date_this_year == today:
+                    if event_date_by_year == today and settings['notify_on_day']:
                         message = f"🎉 Сегодня {'день рождения у' if event_type == 'birthday' else 'праздник:'} {name}!\n"
-                        if wishes: message += f"\nПоздравление: {wishes}"
-                        if notes: message += f"\nЗаметка: {notes}"
+                        if wishes:
+                            message += f"\nПоздравление: {wishes}\n"
+                        if notes:
+                            message += f"\nЗаметка: {notes}"
                         try:
                             self.bot.send_message(chat_id, message)
                         except Exception as e:
                             logging.error(f"Ошибка при отправке сообщения в чат {chat_id}: {e}")
-                    elif event_date_this_year == tomorrow:
+                    elif event_date_by_year == tomorrow and settings['notify_one_day_before']:
                         try:
                             self.bot.send_message(chat_id,
-                                                  f"Напоминание: завтра {'день рождения у' if event_type == 'birthday' else 'праздник:'} {name}! 🎉")
+                                                 f"Напоминание: завтра {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
                         except Exception as e:
                             logging.error(f"Ошибка при отправке напоминания в чат {chat_id}: {e}")
-                    elif event_date_this_year == week_later:
+                    elif event_date_by_year == week_later and settings['notify_one_week_before']:
                         try:
                             self.bot.send_message(chat_id,
-                                                  f"Напоминание: через 7 дней {'день рождения у' if event_type == 'birthday' else 'праздник:'} {name}! 🎉")
+                                                 f"Напоминание: через 7 дней {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
                         except Exception as e:
                             logging.error(f"Ошибка при отправке напоминания в чат {chat_id}: {e}")

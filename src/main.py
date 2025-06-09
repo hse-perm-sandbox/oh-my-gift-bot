@@ -21,7 +21,6 @@ class BirthdayBot:
         print("Бот запущен...")
         self.bot.polling(none_stop=True, interval=0)
 
-
 def start():
     """Точка входа в приложение"""
     setup_logging()

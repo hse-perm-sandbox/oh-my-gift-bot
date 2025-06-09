@@ -33,8 +33,9 @@ class Handlers:
             button1 = types.KeyboardButton("Дни рождения")
             button2 = types.KeyboardButton('Праздники')
             button3 = types.KeyboardButton('Информация о боте')
+            button4 = types.KeyboardButton('Настройка уведомлений')
             markup.row(button1, button2)
-            markup.row(button3)
+            markup.row(button3, button4)
             self.bot.send_message(
                 message.chat.id,
                 f'Привет, {message.from_user.first_name}! Я бот для отслеживания дней рождения и праздников.',
@@ -65,6 +66,20 @@ class Handlers:
             markup.row(button1, button2)
             markup.row(button3, button4)
             self.bot.send_message(message.chat.id, "Выберите действие:", reply_markup=markup)
+
+        # Обработчики меню "Настройки уведомлений"
+        @self.bot.message_handler(func=lambda message: message.text == 'Настройка уведомлений')
+        def show_settings_menu(message):
+            """Показывает меню управления уведомлениями"""
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            button1 = types.KeyboardButton('Уведомления о днях рождения')
+            button2 = types.KeyboardButton('Уведомления о личных праздниках')
+            button3 = types.KeyboardButton('Уведомления о глобальных праздниках')
+            button4 = types.KeyboardButton('Назад')
+            markup.row(button1, button2)
+            markup.row(button3, button4)
+            self.bot.send_message(message.chat.id, "Выберите событие для настройки уведомлений:", reply_markup=markup)
+
 
         # Обработчики списков событий
         @self.bot.message_handler(func=lambda message: message.text == 'Список дней рождения')
@@ -146,6 +161,25 @@ https://t.me/holidaysarewaiting
                 disable_web_page_preview=True
             )
 
+
+        # Обработчик кнопки "Уведомления о днях рождения"
+        @self.bot.message_handler(func=lambda message: message.text == 'Уведомления о днях рождения')
+        def show_settings_birthday_menu(message):
+            """Показывает меню настроек уведомлений для дней рождения"""
+            self.show_notification_settings_menu(message, 'birthday')
+
+        # Обработчик кнопки "Уведомления о личных праздниках"
+        @self.bot.message_handler(func=lambda message: message.text == 'Уведомления о личных праздниках')
+        def show_settings_personal_holidays_menu(message):
+            """Показывает меню настроек уведомлений для личных праздников"""
+            self.show_notification_settings_menu(message, 'holiday')
+
+        # Обработчик кнопки "Уведомления о глобальных праздниках"
+        @self.bot.message_handler(func=lambda message: message.text == 'Уведомления о глобальных праздниках')
+        def show_settings_global_holidays_menu(message):
+            """Показывает меню настроек уведомлений для глобальных праздников"""
+            self.show_notification_settings_menu(message, 'global_holiday')
+
         # Обработчик кнопки "Назад"
         @self.bot.message_handler(func=lambda message: message.text == 'Назад')
         def back_to_main(message):
@@ -154,9 +188,117 @@ https://t.me/holidaysarewaiting
             button1 = types.KeyboardButton("Дни рождения")
             button2 = types.KeyboardButton('Праздники')
             button3 = types.KeyboardButton('Информация о боте')
+            button4 = types.KeyboardButton('Настройка уведомлений')
             markup.row(button1, button2)
-            markup.row(button3)
+            markup.row(button3, button4)
             self.bot.send_message(message.chat.id, "Главное меню:", reply_markup=markup)
+
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('toggle_notification_'))
+        def toggle_notification(call):
+            """Переключает статус уведомления (вкл/выкл) и обновляет существующее сообщение"""
+            try:
+                print(f"Получены callback_data: {call.data}")
+
+                parts = call.data.split('_')
+                print(f"Разделенные части: {parts}")
+
+                if len(parts) < 4 or parts[0] != 'toggle' or parts[1] != 'notification':
+                    print(f"Неверный формат callback_data или префикс: {call.data}")
+                    self.bot.answer_callback_query(call.id, "Ошибка в формате команды")
+                    return
+
+                if parts[2] == 'global' and len(parts) >= 5:
+                    event_type = 'global_holiday'
+                    setting = '_'.join(parts[4:])
+                else:
+                    event_type = parts[2]
+                    setting = '_'.join(parts[3:])
+                print(f"event_type: {event_type}, setting: {setting}")
+
+                # Проверка event_type и setting
+                valid_event_types = ['birthday', 'holiday', 'global_holiday']
+                valid_settings = ['notify_on_day', 'notify_one_day_before', 'notify_one_week_before']
+                if event_type not in valid_event_types:
+                    print(f"Недопустимый event_type: {event_type}, callback_data: {call.data}")
+                    self.bot.answer_callback_query(call.id, "Недопустимый тип события")
+                    return
+                if setting not in valid_settings:
+                    print(f"Недопустимая настройка: {setting}, callback_data: {call.data}")
+                    self.bot.answer_callback_query(call.id, "Недопустимая настройка")
+                    return
+
+                chat_id = call.message.chat.id
+
+                # Получение текущих настроек
+                settings = self.db.get_notification_settings(chat_id, event_type)
+                if not settings:
+                    settings = {'notify_on_day': 1, 'notify_one_day_before': 1, 'notify_one_week_before': 1}
+                    self.db.update_notification_settings(chat_id, event_type, **settings)
+                print(f"Текущие настройки: {settings}")
+
+                # Переключение настроек
+                new_value = 1 if settings.get(setting, 0) == 0 else 0
+                update_data = {setting: new_value}
+                success = self.db.update_notification_settings(chat_id, event_type, **update_data)
+
+                if not success:
+                    print(
+                        f"Не удалось обновить настройки: chat_id={chat_id}, event_type={event_type}, setting={setting}")
+                    self.bot.answer_callback_query(call.id, "Ошибка при обновлении настроек")
+                    return
+
+                # Получение обновленных настроек
+                updated_settings = self.db.get_notification_settings(chat_id, event_type)
+                if not updated_settings:
+                    print(f"Настройки не найдены после обновления: chat_id={chat_id}, event_type={event_type}")
+                    self.bot.answer_callback_query(call.id, "Ошибка: настройки не найдены")
+                    return
+                print(f"Обновленные настройки: {updated_settings}")
+
+                # Создание нового меню
+                event_name = {
+                    'birthday': 'Дней рождения',
+                    'holiday': 'Личных праздников',
+                    'global_holiday': 'Глобальных праздников'
+                }[event_type]
+
+                markup = types.InlineKeyboardMarkup()
+                markup.row(
+                    types.InlineKeyboardButton(
+                        f"В день события {'✅' if updated_settings['notify_on_day'] else '❌'}",
+                        callback_data=f"toggle_notification_{event_type}_notify_on_day"
+                    )
+                )
+                markup.row(
+                    types.InlineKeyboardButton(
+                        f"За 1 день {'✅' if updated_settings['notify_one_day_before'] else '❌'}",
+                        callback_data=f"toggle_notification_{event_type}_notify_one_day_before"
+                    )
+                )
+                markup.row(
+                    types.InlineKeyboardButton(
+                        f"За неделю {'✅' if updated_settings['notify_one_week_before'] else '❌'}",
+                        callback_data=f"toggle_notification_{event_type}_notify_one_week_before"
+                    )
+                )
+
+                text = f"Настройки уведомлений для {event_name}:"
+
+                # Редактирование существующего сообщения
+                try:
+                    self.bot.edit_message_text(
+                        text,
+                        chat_id=chat_id,
+                        message_id=call.message.message_id,
+                        reply_markup=markup
+                    )
+                    self.bot.answer_callback_query(call.id, "Настройка обновлена")
+                except Exception as e:
+                    print(f"Ошибка при редактировании сообщения: {e}, callback_data={call.data}")
+                    self.bot.answer_callback_query(call.id, "Ошибка при обновлении меню")
+            except Exception as e:
+                print(f"Общая ошибка в toggle_notification: {e}, callback_data={call.data}")
+                self.bot.answer_callback_query(call.id, "Произошла ошибка")
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith('birthday_'))
         def show_birthday_profile(call):
@@ -347,6 +489,7 @@ https://t.me/holidaysarewaiting
             if self.db.add_event(message.chat.id, name, date, event_type=event_type):
                 event_name = "День рождения" if event_type == 'birthday' else "Праздник"
                 self.bot.send_message(message.chat.id, f"{event_name} {name} добавлен!")
+                self.db.init_notification_settings(message.chat.id)  # Инициализация настроек уведомлений
             else:
                 self.bot.send_message(message.chat.id, f"{name} уже существует в списке.")
         except ValueError:
@@ -430,6 +573,56 @@ https://t.me/holidaysarewaiting
             call.message.message_id,
             reply_markup=markup
         )
+
+    def show_notification_settings_menu(self, message, event_type, message_id=None):
+        """Показывает меню настроек уведомлений для указанного типа событий"""
+        chat_id = message.chat.id
+        settings = self.db.get_notification_settings(chat_id, event_type)
+        if not settings:
+            settings = {'notify_on_day': 1, 'notify_one_day_before': 1, 'notify_one_week_before': 1}
+            self.db.update_notification_settings(chat_id, event_type, **settings)
+
+        event_name = {
+            'birthday': 'Дней рождения',
+            'holiday': 'Личных праздников',
+            'global_holiday': 'Глобальных праздников'
+        }[event_type]
+
+        markup = types.InlineKeyboardMarkup()
+        markup.row(
+            types.InlineKeyboardButton(
+                f"В день события {'✅' if settings['notify_on_day'] else '❌'}",
+                callback_data=f"toggle_notification_{event_type}_notify_on_day"
+            )
+        )
+        markup.row(
+            types.InlineKeyboardButton(
+                f"За 1 день {'✅' if settings['notify_one_day_before'] else '❌'}",
+                callback_data=f"toggle_notification_{event_type}_notify_one_day_before"
+            )
+        )
+        markup.row(
+            types.InlineKeyboardButton(
+                f"За неделю {'✅' if settings['notify_one_week_before'] else '❌'}",
+                callback_data=f"toggle_notification_{event_type}_notify_one_week_before"
+            )
+        )
+
+        text = f"Настройки уведомлений для {event_name}:"
+
+        try:
+            if message_id:
+                self.bot.edit_message_text(
+                    text,
+                    chat_id,
+                    message_id,
+                    reply_markup=markup
+                )
+            else:
+                self.bot.send_message(chat_id, text, reply_markup=markup)
+        except Exception as e:
+            print(f"Error in show_notification_settings: {e}")
+            self.bot.send_message(chat_id, text, reply_markup=markup)
 
     def add_gift_start(self, call):
         """Показывает меню выбора способа добавления идей подарков"""
@@ -620,11 +813,19 @@ https://t.me/holidaysarewaiting
             markup.add(types.InlineKeyboardButton(name, callback_data=f"{event_type}_{name}"))
 
         try:
-            self.bot.edit_message_text(
-                f"Выберите {event_name[:-1]}:",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
+            if event_name == "дней рождения":
+                self.bot.edit_message_text(
+                    f"Выберите день рождения:",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=markup
+            )
+            else:
+                self.bot.edit_message_text(
+                    f"Выберите праздник:",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=markup
             )
         except Exception as e:
             print(f"Ошибка при редактировании сообщения: {e}")
