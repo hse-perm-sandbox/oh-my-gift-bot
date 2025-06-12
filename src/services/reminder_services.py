@@ -9,6 +9,7 @@ from src.database.database import Database
 
 class ReminderService:
     """Сервис для отправки напоминаний о событиях"""
+
     def __init__(self, bot: TeleBot, db: Database):
         """Инициализация с ботом и базой данных"""
         self.bot = bot
@@ -26,6 +27,18 @@ class ReminderService:
     def check_reminders(self):
         """Основной цикл проверки событий"""
         while self.running:
+            now = datetime.datetime.now()
+
+            # Вычисление времени до следующей полночи
+            next_midnight = (now + datetime.timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            seconds_until_midnight = (next_midnight - now).total_seconds()
+
+            # Уход в сон до следующей полночи
+            time.sleep(seconds_until_midnight)
+
+            # Получение текущей даты после пробуждения
             today = datetime.date.today()
             tomorrow = today + datetime.timedelta(days=1)
             week_later = today + datetime.timedelta(days=7)
@@ -35,8 +48,6 @@ class ReminderService:
                 self.check_personal_events(today, tomorrow, week_later)
             except Exception as e:
                 logging.error(f"Ошибка при проверке напоминаний: {e}")
-
-            time.sleep(3600) # Проверка каждый час
 
     def check_global_holidays(self, today: datetime.date, tomorrow: datetime.date, week_later: datetime.date):
         """Проверяет и отправляет уведомления о глобальных праздниках"""
@@ -109,12 +120,12 @@ class ReminderService:
                     elif event_date_by_year == tomorrow and settings['notify_one_day_before']:
                         try:
                             self.bot.send_message(chat_id,
-                                                 f"Напоминание: завтра {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
+                                                  f"Напоминание: завтра {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
                         except Exception as e:
                             logging.error(f"Ошибка при отправке напоминания в чат {chat_id}: {e}")
                     elif event_date_by_year == week_later and settings['notify_one_week_before']:
                         try:
                             self.bot.send_message(chat_id,
-                                                 f"Напоминание: через 7 дней {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
+                                                  f"Напоминание: через 7 дней {'день рождения у' if event_type == 'birthday' else 'праздник'} {name}! 🎉")
                         except Exception as e:
                             logging.error(f"Ошибка при отправке напоминания в чат {chat_id}: {e}")
