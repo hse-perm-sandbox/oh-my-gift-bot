@@ -1,0 +1,70 @@
+name: "CI CD actions"
+on:
+  push:
+    branches:
+      - test
+    paths-ignore:
+      - '**.md'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/${{ github.repository }}:${{ github.ref_name }} 
+  TEST_CONTAINER_NAME: oh-my-gift-bot-test
+  TEST_VOLUME_NAME: oh-my-gift-bot-test-db
+
+jobs:
+  build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}
+  deploy-test:
+    name: Test deploy
+    environment: test
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.result == 'success'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SANDBOX_HOST }}
+          username: ${{ secrets.SANDBOX_USER }}
+          key: ${{ secrets.SANDBOX_KEY }}
+          port: ${{ secrets.SANDBOX_PORT }}
+          script: |
+            docker logout;
+            docker pull ${{ env.IMAGE_NAME }};
+            docker rm -f ${{ env.TEST_CONTAINER_NAME }} || true;
+            docker run -d \
+              -v ${{ env.TEST_VOLUME_NAME }}:/app/db/ \
+              -e TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} \
+              -e DATABASE_PATH=${{ vars.DATABASE_PATH }} \
+              -e API_URL=${{ secrets.API_URL }} \
+              -e API_KEY=${{ secrets.API_KEY }} \
+              -e LOG_LEVEL=${{ vars.LOG_LEVEL }} \
+              --restart=always \
+              --memory="1g" \
+              --cpus="1" \
+              --name ${{ env.TEST_CONTAINER_NAME }} \
+              ${{ env.IMAGE_NAME }};
