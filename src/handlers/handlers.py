@@ -151,7 +151,7 @@ class Handlers:
 Используйте кнопки меню для навигации.
 
 Ссылка на руководство пользователя:
-https://drive.google.com/file/d/1vWW2xOe9dFCfBCGBaMvCsvZBe01v6gQ7/view?usp=sharing
+https://docs.google.com/document/d/1n6zQ1scHs9w8_xhXfpAuB51IUD_pdITc/edit?usp=sharing&ouid=118054435887559363436&rtpof=true&sd=true
 Ссылка на канал технической поддержки:
 https://t.me/holidaysarewaiting
 """
